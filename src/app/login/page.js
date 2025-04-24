@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 
+
 export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -24,7 +25,7 @@ export default function LoginPage() {
       if (result?.error) {
         setError(result.error);
       } else {
-        router.push("/dashboard");
+        router.push("/production");
       }
     } catch (err) {
       setError("Credenciales inválidas");
