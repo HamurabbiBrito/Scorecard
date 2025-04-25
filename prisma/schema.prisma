@@ -14,8 +14,8 @@ model User {
   role          UserRole  @default(Operador)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  accounts      Account[]  // Relación con Account
-  sessions      Session[]  // Relación con Session
+  accounts      Account[]
+  sessions      Session[]
 }
 
 enum UserRole {
@@ -47,4 +47,93 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AccidentReport {
+  id                      String   @id @default(uuid())
+  fecha                   DateTime
+  area                    String
+  cantidadAccidentes      Int
+  cantidadCuasiAccidentes Int
+  diasUltimoAccidente     Int
+  notas                   String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+model QualityReport {
+  id                      String   @id @default(uuid())
+  fecha                   DateTime
+  area                    String
+  qualityCreditNoteUSD    String
+  qualityCreditNoteUSDBattery Float
+  today                   Int
+  mesAnterior             String
+  numero                  String
+  cantidadQuejas          Int
+  cantidadQuejasBateria   Int
+  observaciones           String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+model KaizenReport {
+  id          String   @id @default(uuid())
+  fecha       DateTime
+  area        String
+  proyecto    String
+  descripcion String
+  impacto     String
+  estado      String   @default("pendiente")
+  responsable String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model RHReport {
+  id               String   @id @default(uuid())
+  fecha            DateTime
+  area             String
+  personalActual   Int
+  vacantes         Int
+  necesidadesCapacitacion String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model FleteReport {
+  id          String   @id @default(uuid())
+  fecha       DateTime
+  area        String
+  transportista String
+  costo       Float
+  descripcion String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ControlReport {
+  id          String   @id @default(uuid())
+  fecha       DateTime
+  area        String
+  turno       String
+  metaDiaria  Int
+  producido   Int
+  rechazos    Int
+  eficiencia  Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ProductionReport {
+  id          String   @id @default(uuid())
+  fecha       DateTime
+  area        String
+  producto    String
+  cantidad    Float
+  horasMaquina Int
+  paradas     Int
+  observaciones String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

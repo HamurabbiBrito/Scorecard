@@ -15,7 +15,7 @@ export default function FletesForm({ area }) {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Transportista</label>
+          <label className="block text-sm font-medium text-gray-700">Special freight {area.toUpperCase()}</label>
           <input
             type="text"
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
@@ -23,7 +23,7 @@ export default function FletesForm({ area }) {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Costo ($)</label>
+          <label className="block text-sm font-medium text-gray-700">Special freight customer {area.toUpperCase()}</label>
           <input
             type="number"
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
@@ -32,13 +32,7 @@ export default function FletesForm({ area }) {
           />
         </div>
       </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Descripción</label>
-        <textarea
-          rows={2}
-          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-        />
-      </div>
+
       <button
         type="submit"
         className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
