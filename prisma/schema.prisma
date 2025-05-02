@@ -1,21 +1,11 @@
+// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-model User {
-  id            String    @id @default(uuid())
-  username      String    @unique
-  password      String
-  role          UserRole  @default(Operador)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  accounts      Account[]
-  sessions      Session[]
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
 }
 
 enum UserRole {
@@ -23,20 +13,37 @@ enum UserRole {
   Operador
 }
 
+enum AccountType {
+  oauth
+  email
+  credentials
+}
+
+model User {
+  id            String     @id @default(uuid())
+  username      String     @unique
+  password      String
+  role          UserRole   @default(Operador)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  accounts      Account[]  @relation("UserAccounts")
+  sessions      Session[]  @relation("UserSessions")
+}
+
 model Account {
-  id                String  @id @default(uuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token         String?
-  session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String      @id @default(uuid())
+  userId             String
+  type               AccountType
+  provider           String
+  providerAccountId  String
+  refresh_token      String?     @db.Text
+  access_token       String?     @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?     @db.Text
+  session_state      String?
+  user               User        @relation("UserAccounts", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -46,94 +53,189 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User     @relation("UserSessions", fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model AccidentReport {
-  id                      String   @id @default(uuid())
+  id                      Int       @id @default(autoincrement())
   fecha                   DateTime
-  area                    String
-  cantidadAccidentes      Int
-  cantidadCuasiAccidentes Int
-  diasUltimoAccidente     Int
-  notas                   String?
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  areaId                  Int
+  area                    Area      @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  cantidadAccidentes      Int       @default(0)
+  cantidadCuasiAccidentes Int       @default(0)
+  diasUltimoAccidente     Int       @default(0)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([areaId, fecha])
 }
 
 model QualityReport {
-  id                      String   @id @default(uuid())
-  fecha                   DateTime
-  area                    String
-  qualityCreditNoteUSD    String
+  id                        Int     @id @default(autoincrement())
+  fecha                     DateTime
+  areaId                    Int
+  area                      Area     @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  qualityCreditNoteUSD      String
   qualityCreditNoteUSDBattery Float
-  today                   Int
-  mesAnterior             String
-  numero                  String
-  cantidadQuejas          Int
-  cantidadQuejasBateria   Int
-  observaciones           String?
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  mesAnterior               String
+  numero                    String
+  cantidadQuejas            Int
+  cantidadQuejasBateria     Int
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  @@index([areaId, fecha])
+}
+
+model QuejasReport {
+  id                      Int       @id @default(autoincrement())
+  areaId                  Int
+  area                    Area      @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  fechaQuejaCliente       DateTime
+  cantidadQuejas          Int 
+  diasSinQuejas           Int
+  fechaQuejaClienteBateria DateTime
+  cantidadQuejasBateria   Int 
+  diasSinQuejasBateria    Int
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([areaId, fechaQuejaCliente])
 }
 
 model KaizenReport {
-  id          String   @id @default(uuid())
-  fecha       DateTime
-  area        String
-  proyecto    String
-  descripcion String
-  impacto     String
-  estado      String   @default("pendiente")
-  responsable String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                      Int       @id @default(autoincrement())
+  fecha                   DateTime
+  areaId                  Int
+  area                    Area      @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  percentAudit5s          Float
+  kaizenIdeas             Int
+  savings                 Int
+  projectDescription      String
+  anualProjectDescription String
+  savingsAnual            String
+  target5s                String
+  numeroKaizen            Float
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([areaId, fecha])
 }
 
 model RHReport {
-  id               String   @id @default(uuid())
-  fecha            DateTime
-  area             String
-  personalActual   Int
-  vacantes         Int
-  necesidadesCapacitacion String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id              Int       @id @default(autoincrement())
+  fecha           DateTime
+  areaId          Int
+  area            Area      @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  hrAbsenteeims   Int
+  hrInability     Int
+  hrTurnover      Int
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([areaId, fecha])
 }
 
 model FleteReport {
-  id          String   @id @default(uuid())
-  fecha       DateTime
-  area        String
-  transportista String
-  costo       Float
-  descripcion String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              Int       @id @default(autoincrement())
+  fecha           DateTime
+  areaId          Int
+  area            Area      @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  specialFreight  String
+  specialFreightCustomer String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([areaId, fecha])
 }
 
 model ControlReport {
-  id          String   @id @default(uuid())
-  fecha       DateTime
-  area        String
-  turno       String
-  metaDiaria  Int
-  producido   Int
-  rechazos    Int
-  eficiencia  Float
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                                Int       @id @default(autoincrement())
+  fecha                             DateTime
+  areaId                            Int
+  area                              Area      @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  dlp                               Float
+  capacityUtilization               Float
+  dlpBattery                        Float
+  capacityUtilizationBattery        Float
+  variationsInventoryCobreUSD       Float
+  variationsInventoryCobreKg        Float
+  variationsInventoryCompuestoUSD   Float
+  variationsInventoryCompuestoKg    Float
+  variationsInventoryCableUSD       Float
+  variationsInventoryCableKg        Float
+  dlpSemana                         Float
+  dlpSemanaMaterial                 Float
+  metaMensual                       Float
+  metaMensualBateria                Float
+  impactoDlpEnUsd                   Float
+  impactoDlpEnUsdBateria            Float
+  createdAt                         DateTime  @default(now())
+  updatedAt                         DateTime  @updatedAt
+
+  @@index([areaId, fecha])
 }
 
 model ProductionReport {
-  id          String   @id @default(uuid())
-  fecha       DateTime
-  area        String
-  producto    String
-  cantidad    Float
-  horasMaquina Int
-  paradas     Int
-  observaciones String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                          Int       @id @default(autoincrement())
+  fecha                       DateTime
+  areaId                      Int
+  area                        Area      @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  maquinas                    String
+  numeroSap                   Float
+  produccionKm                Float
+  produccionKg                Float
+  kgScrap                     Float
+  percentScrap               Float
+  oee                         Float
+  percentAvailability         Float
+  percentPerformance          Float
+  percentQuality              Float
+  reventones                  Float
+  tiempoMuerto                Float
+  kmReventon                  Float
+  scrapCu                     Float
+  scrapSn                     Float
+  scrapTotal                  Float
+  yield                       Float
+  yieldTotal                  Float
+  kmEnviadosRebobinados       Float
+  kmRebobinados               Float
+  targetOeeL5                 Float
+  targetScrapL5               Float
+  comentariosOee              String?
+  comentariosScrap            String?
+  concatenado                 String?
+  validacion                  String?
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime  @updatedAt
+
+  @@index([areaId, fecha])
+}
+
+model Area {
+  id                  Int                 @id @default(autoincrement())
+  nombre              String              @unique
+  slug                String              @unique
+  codigo              String?             @unique
+  descripcion         String?
+  lastAccidentDate    DateTime?           // Campo nuevo (para el último reporte de accidentes)
+  
+  // Relaciones
+  accidentReports     AccidentReport[]
+  qualityReports      QualityReport[]
+  quejasReports       QuejasReport[]
+  kaizenReports       KaizenReport[]
+  rhReports           RHReport[]
+  fleteReports        FleteReport[]
+  controlReports      ControlReport[]
+  productionReports   ProductionReport[]
+
+  // Auditoría
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime?            @updatedAt
+  deletedAt           DateTime?
+
+  @@map("areas")
+  @@index([nombre])
 }
