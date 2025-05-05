@@ -1,52 +1,50 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import { formsConfig } from './formConfig';
 import LoadingSpinner from '@/components/LoadingSpinner';
 
-export default function Tabs({ areaSlug }) {
+export default function Tabs() {
+  const params = useParams();
   const [activeTab, setActiveTab] = useState(formsConfig[0].id);
-  const [areaInfo, setAreaInfo] = useState(null);
+  const [areaData, setAreaData] = useState({ id: null, nombre: '' });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const router = useRouter();
 
   useEffect(() => {
     const fetchAreaData = async () => {
       try {
-        const response = await fetch(`/api/areas/${areaSlug.toLowerCase()}`);
-        
+        const slug = params.area?.toLowerCase();
+        if (!slug) throw new Error('Slug no definido');
+
+        const response = await fetch(`/api/areas/${slug}`);
         if (!response.ok) throw new Error('Área no encontrada');
-        
+
         const data = await response.json();
-        
-        if (data.error) throw new Error(data.error);
-        
-        setAreaInfo(data);
-        setError('');
-      } catch (error) {
-        setError(error.message);
-        router.push('/production');
+        if (!data?.id) throw new Error('Datos de área inválidos');
+
+        setAreaData({
+          id: data.id,
+          nombre: data.nombre || data.slug.toUpperCase()
+        });
+      } catch (err) {
+        setError(err.message);
       } finally {
         setLoading(false);
       }
     };
 
-    if (areaSlug) fetchAreaData();
-  }, [areaSlug, router]);
+    fetchAreaData();
+  }, [params.area]);
 
   if (loading) return <LoadingSpinner message="Cargando área..." />;
-
-  if (error) {
-    return (
-      <div className="p-4 bg-red-100 text-red-700 rounded-lg">
-        {error}
-      </div>
-    );
-  }
+  if (error) return <div className="p-4 bg-red-100 text-red-700">{error}</div>;
+  if (!areaData.id) return <div className="p-4 bg-yellow-100 text-yellow-700">Área no disponible</div>;
 
   return (
     <div className="p-4">
+      <h1 className="text-2xl font-bold mb-4">{areaData.nombre}</h1>
+      
       <div className="flex border-b overflow-x-auto">
         {formsConfig.map(tab => (
           <button
@@ -64,7 +62,10 @@ export default function Tabs({ areaSlug }) {
       </div>
 
       <div className="mt-6">
-        {areaInfo && formsConfig.find(tab => tab.id === activeTab)?.form(areaInfo)}
+        {formsConfig.find(tab => tab.id === activeTab)?.form({
+          areaId: areaData.id,
+          areaName: areaData.nombre
+        })}
       </div>
     </div>
   );

@@ -13,41 +13,41 @@ export const formsConfig = [
   {
     id: 'accidentes',
     label: 'Accidentes',
-    form: (area) => <AccidentesForm area={area} />
+    form: ({ areaId, areaName }) => <AccidentesForm areaId={areaId} areaName={areaName} />
   },
   {
     id: 'calidad',
     label: 'Calidad',
-    form: (area) => <CalidadForm area={area} />
+    form: ({ areaId, areaName }) => <CalidadForm areaId={areaId} areaName={areaName} />
   },
   {
     id: 'dias-sin-queja',
     label: 'Días sin queja',
-    form: (area) => <DSQForm area={area} />
+    form: ({ areaId, areaName }) => <DSQForm areaId={areaId} areaName={areaName} />
   },
   {
     id: 'kaizen',
     label: 'Kaizen',
-    form: (area) => <KaizenForm area={area} />
+    form: ({areaId, areaName}) => <KaizenForm areaId={areaId} areaName={areaName} />
   },
   {
     id: 'rh',
     label: 'RH',
-    form: (area) => <RHForm area={area} />
+    form: ({areaId, areaName}) => <RHForm areaId={areaId} areaName={areaName} />
   },
   {
     id: 'fletes',
     label: 'Fletes especiales',
-    form: (area) => <FletesForm area={area} />
+    form: ({areaId, areaName}) => <FletesForm areaId={areaId} areaName={areaName} />
   },
   {
     id: 'control',
     label: 'Control',
-    form: (area) => <ControlForm area={area} />
+    form: ({areaId, areaName}) => <ControlForm areaId={areaId} areaName={areaName} />
   },
   {
     id: 'produccion',
     label: 'Producción',
-    form: (area) => <ProduccionForm area={area} />
+    form: ({areaId, areaName}) => <ProduccionForm areaId={areaId} areaName={areaName} />
   }
 ];

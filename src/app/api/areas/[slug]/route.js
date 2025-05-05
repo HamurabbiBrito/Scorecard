@@ -1,20 +1,11 @@
 // app/api/areas/[slug]/route.js
-import prisma from '@/lib/prisma'
+import prisma from '@/lib/prisma';
 
 export async function GET(request, { params }) {
   try {
-    const normalizedSlug = params.slug.toLowerCase(); // Conversión forzada
-    
     const area = await prisma.area.findUnique({
-      where: { 
-        slug: normalizedSlug // Usar versión normalizada
-      },
-      select: { 
-        id: true,
-        nombre: true,
-        slug: true,
-        lastAccidentDate: true // Incluir el nuevo campo
-      }
+      where: { slug: params.slug.toLowerCase() },
+      select: { id: true, nombre: true, slug: true }
     });
 
     if (!area) {
