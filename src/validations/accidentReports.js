@@ -18,8 +18,31 @@ const accidentReportSchema = Joi.object({
   diasUltimoAccidente: Joi.number().min(0).default(0)
 }).options({ abortEarly: false })
 
+// Validador para creación (existente)
 export const validateAccidentReport = (data) => {
   const { error, value } = accidentReportSchema.validate(data)
+  
+  if (error) {
+    return {
+      success: false,
+      errors: error.details.map(detail => ({
+        path: detail.path.join('.'),
+        message: detail.message
+      }))
+    }
+  }
+  
+  return { success: true, data: value }
+}
+
+// NUEVO Validador para actualizaciones parciales
+export const validatePartialAccidentReport = (data) => {
+  const partialSchema = accidentReportSchema.fork(
+    ['fecha', 'areaId', 'cantidadAccidentes', 'cantidadCuasiAccidentes', 'diasUltimoAccidente'],
+    (schema) => schema.optional()
+  )
+
+  const { error, value } = partialSchema.validate(data)
   
   if (error) {
     return {

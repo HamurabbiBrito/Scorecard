@@ -16,6 +16,7 @@ export async function generateStaticParams() {
 
 export default async function Page({ params }) {
   // Obtener el área COMPLETA incluyendo el id
+  const {area: paramArea} = await params; // Desestructuramos el slug del área de los parámetros
   const area = await prisma.area.findUnique({
     where: { 
       slug: params.area.toLowerCase() 
