@@ -1,9 +1,9 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import ReportList from './ReportList';
 
 export default function AccidentesForm() {
-  // Hooks de routing
   const router = useRouter();
   const params = useParams();
   const areaSlug = params?.area;
@@ -16,28 +16,28 @@ export default function AccidentesForm() {
     diasUltimoAccidente: 0
   });
 
-  // Estados de UI y carga
+  // Estados de UI
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  
-  // Estados de datos
   const [areaInfo, setAreaInfo] = useState(null);
-  const [availableReports, setAvailableReports] = useState([]);
-  const [filteredReports, setFilteredReports] = useState([]);
-  
-  // Estados de edición
   const [reportToEdit, setReportToEdit] = useState(null);
-  const [showEditOptions, setShowEditOptions] = useState(false);
-  
-  // Estados de filtrado
-  const [showDateFilter, setShowDateFilter] = useState(false);
-  const [dateRange, setDateRange] = useState({
-    start: '',
-    end: ''
-  });
 
-  // Obtener información del área al cargar
+  const accidentFieldConfig = [
+    { label: 'Fecha', key: 'fecha', type: 'date' },
+    { label: 'Accidentes', key: 'cantidadAccidentes', type: 'number' },
+    { label: 'Cuasi accidentes', key: 'cantidadCuasiAccidentes', type: 'number' },
+    { label: 'Días sin accidentes', key: 'diasUltimoAccidente', type: 'number' }
+  ]
+
+  // Función handleEdit que faltaba
+  const handleEdit = (report) => {
+    setReportToEdit({
+      ...report,
+      fecha: report.fecha.split('T')[0] // Formatear fecha para input
+    });
+  };
+  // Obtener información del área
   useEffect(() => {
     const fetchAreaData = async () => {
       try {
@@ -55,11 +55,6 @@ export default function AccidentesForm() {
     if (areaSlug) fetchAreaData();
   }, [areaSlug, router]);
 
-  // Sincronizar reportes filtrados
-  useEffect(() => {
-    setFilteredReports(availableReports);
-  }, [availableReports]);
-
   // Manejar cambios en los inputs
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -69,7 +64,7 @@ export default function AccidentesForm() {
     }));
   };
 
-  // Validar formulario
+  // Validación del formulario
   const validateForm = (data) => {
     const errors = [];
     if (!data.fecha) errors.push('La fecha es requerida');
@@ -108,7 +103,6 @@ export default function AccidentesForm() {
 
       if (!response.ok) throw new Error(result.error || 'Error al guardar');
 
-      // Reset después de éxito
       setFormData({
         fecha: new Date().toISOString().split('T')[0],
         cantidadAccidentes: 0,
@@ -122,30 +116,6 @@ export default function AccidentesForm() {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  // Cargar reportes para edición
-  const loadReportsForEditing = async () => {
-    try {
-      const response = await fetch(`/api/accidents?areaId=${areaInfo.id}`);
-      if (!response.ok) throw new Error('Error al cargar reportes');
-      const result = await response.json();
-      setAvailableReports(result.data || []);
-      setFilteredReports(result.data || []);
-      setShowEditOptions(true);
-      setShowDateFilter(true);
-    } catch (error) {
-      console.error('Error:', error);
-      setErrorMessage(error.message);
-    }
-  };
-
-  // Preparar reporte para edición
-  const handleEdit = (report) => {
-    setReportToEdit({
-      ...report,
-      fecha: report.fecha.split('T')[0]
-    });
   };
 
   // Actualizar reporte existente
@@ -174,11 +144,10 @@ export default function AccidentesForm() {
 
       const result = await response.json();
 
-      if (!response.ok) throw new Error(result.error || 'Error al actualizar');
+      if (!response.ok) {throw new Error(result.error || 'Error al actualizar');}
 
       setSuccessMessage('Reporte actualizado exitosamente!');
       setReportToEdit(null);
-      loadReportsForEditing();
     } catch (error) {
       console.error('Error:', error);
       setErrorMessage(error.message);
@@ -187,36 +156,14 @@ export default function AccidentesForm() {
     }
   };
 
-  // Aplicar filtro por fechas
-  const applyDateFilter = () => {
-    if (!dateRange.start || !dateRange.end) {
-      setFilteredReports(availableReports);
-      return;
-    }
-
-    const startDate = new Date(dateRange.start);
-    const endDate = new Date(dateRange.end);
-    
-    const filtered = availableReports.filter(report => {
-      const reportDate = new Date(report.fecha);
-      return reportDate >= startDate && reportDate <= endDate;
-    });
-
-    setFilteredReports(filtered);
-  };
-
-  // Formatear fecha para mostrar
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    const adjustedDate = new Date(date.getTime() + Math.abs(date.getTimezoneOffset() * 60000));
-    return adjustedDate.toLocaleDateString('es-ES', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
+  // Preparar reporte para edición
+  const handleEditReport = (report) => {
+    setReportToEdit({
+      ...report,
+      fecha: report.fecha.split('T')[0]
     });
   };
 
-  // Loading state
   if (!areaInfo) {
     return (
       <div className="text-center p-8">
@@ -229,7 +176,7 @@ export default function AccidentesForm() {
   return (
     <div className="bg-white p-6 rounded-lg shadow-md max-w-4xl mx-auto">
       <h2 className="text-xl font-semibold mb-4">
-        Reporte de Accidentes - {areaInfo.nombre}
+        Reporte de Accidentes - {areaInfo?.nombre}
       </h2>
 
       {/* Mensajes de estado */}
@@ -332,98 +279,20 @@ export default function AccidentesForm() {
         </div>
       </form>
 
-      {/* Sección de reportes existentes */}
-      <div className="mt-8">
-        <button
-          onClick={loadReportsForEditing}
-          className="mb-4 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
-        >
-          {availableReports.length > 0 ? 'Recargar reportes' : 'Ver reportes existentes'}
-        </button>
-
-        {/* Filtro por rango de fechas */}
-        {showDateFilter && (
-          <div className="mb-6 p-4 border rounded-lg bg-gray-50">
-            <h3 className="text-lg font-medium mb-3">Filtrar por fecha</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha inicial</label>
-                <input
-                  type="date"
-                  value={dateRange.start}
-                  onChange={(e) => setDateRange({...dateRange, start: e.target.value})}
-                  className="w-full border border-gray-300 rounded-md shadow-sm p-2"
-                  max={dateRange.end || new Date().toISOString().split('T')[0]}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha final</label>
-                <input
-                  type="date"
-                  value={dateRange.end}
-                  onChange={(e) => setDateRange({...dateRange, end: e.target.value})}
-                  className="w-full border border-gray-300 rounded-md shadow-sm p-2"
-                  min={dateRange.start}
-                  max={new Date().toISOString().split('T')[0]}
-                />
-              </div>
-            </div>
-            <div className="flex justify-end mt-3 space-x-3">
-              <button
-                onClick={() => {
-                  setDateRange({ start: '', end: '' });
-                  setFilteredReports(availableReports);
-                }}
-                className="px-3 py-1 text-gray-600 hover:text-gray-800 text-sm"
-              >
-                Limpiar filtros
-              </button>
-              <button
-                onClick={applyDateFilter}
-                className="px-4 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
-              >
-                Aplicar filtro
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Lista de reportes */}
-        {filteredReports.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredReports.map(report => (
-              <div key={report.id} className="border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow bg-white">
-                <div className="flex justify-between items-start">
-                  <h3 className="font-medium text-lg">
-                    {formatDate(report.fecha)}
-                  </h3>
-                  <button 
-                    onClick={() => handleEdit(report)}
-                    className="text-blue-600 hover:text-blue-800 text-sm"
-                  >
-                    Editar
-                  </button>
-                </div>
-                
-                <div className="mt-3 space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Accidentes:</span>
-                    <span className="font-medium">{report.cantidadAccidentes}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Cuasi accidentes:</span>
-                    <span className="font-medium">{report.cantidadCuasiAccidentes}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Días sin accidentes:</span>
-                    <span className="font-medium">{report.diasUltimoAccidente}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Componente modularizado de reportes */}
+      <ReportList
+        areaId={areaInfo?.id}
+        onEdit={handleEdit}  // Pasamos la función handleEdit
+        reportToEdit={reportToEdit}
+        apiPath="/api/accidents"
+        emptyMessage="No hay reportes de accidentes disponibles"
+        fieldsConfig={[
+          { label: 'Fecha', key: 'fecha', type: 'date' },
+          { label: 'Accidentes', key: 'cantidadAccidentes', type: 'number' },
+          { label: 'Cuasi accidentes', key: 'cantidadCuasiAccidentes', type: 'number' },
+          { label: 'Días sin accidentes', key: 'diasUltimoAccidente', type: 'number' }
+        ]}
+      />
     </div>
   );
 }
