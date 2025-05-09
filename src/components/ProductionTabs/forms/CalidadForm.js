@@ -2,11 +2,34 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import ReportList from './ReportList';
+import ReportCard from './ReportList/ReportCard';
+
+// Función mejorada para manejo de fechas con zona horaria
+const formatDateForInput = (dateString) => {
+  if (!dateString) return '';
+  
+  // Asegurarse de manejar correctamente la zona horaria
+  const date = new Date(dateString);
+  
+  // Ajustar para evitar problemas de zona horaria
+  const adjustedDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
+  
+  const year = adjustedDate.getFullYear();
+  const month = String(adjustedDate.getMonth() + 1).padStart(2, '0');
+  const day = String(adjustedDate.getDate()).padStart(2, '0');
+  
+  return `${year}-${month}-${day}`;
+};
+
+// Función para enviar fechas al servidor
+const formatDateForServer = (dateString) => {
+  const date = new Date(dateString);
+  return date.toISOString();
+};
 
 export default function CalidadForm({ areaId, areaName }) {
-  // Estado inicial del formulario
   const initialFormData = {
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: formatDateForInput(new Date()),
     qualityCreditNoteUSD: '',
     qualityCreditNoteUSDBattery: 0,
     mesAnterior: '',
@@ -22,20 +45,16 @@ export default function CalidadForm({ areaId, areaName }) {
   const [reportToEdit, setReportToEdit] = useState(null);
   const router = useRouter();
 
-  // Efecto para sincronizar reportToEdit con formData
   useEffect(() => {
     if (reportToEdit) {
+      // Asegurar que la fecha se formatea correctamente al editar
+      const formattedDate = formatDateForInput(reportToEdit.fecha);
+      console.log('Fecha original:', reportToEdit.fecha, 'Fecha formateada:', formattedDate);
+      
       setFormData({
-        fecha: reportToEdit.fecha,
-        qualityCreditNoteUSD: reportToEdit.qualityCreditNoteUSD,
-        qualityCreditNoteUSDBattery: reportToEdit.qualityCreditNoteUSDBattery,
-        mesAnterior: reportToEdit.mesAnterior,
-        numero: reportToEdit.numero,
-        cantidadQuejas: reportToEdit.cantidadQuejas,
-        cantidadQuejasBateria: reportToEdit.cantidadQuejasBateria
+        ...reportToEdit,
+        fecha: formattedDate
       });
-    } else {
-      setFormData(initialFormData);
     }
   }, [reportToEdit]);
 
@@ -43,7 +62,7 @@ export default function CalidadForm({ areaId, areaName }) {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: ['qualityCreditNoteUSD', 'mesAnterior', 'numero'].includes(name) 
+      [name]: ['qualityCreditNoteUSD', 'mesAnterior', 'numero', 'fecha'].includes(name) 
         ? value 
         : Number(value) || 0
     }));
@@ -62,54 +81,90 @@ export default function CalidadForm({ areaId, areaName }) {
     e.preventDefault();
     setError('');
     setSuccess('');
-
-    const errors = validateForm();
-    if (errors.length > 0) {
-      setError(errors.join(', '));
-      return;
-    }
-
-    setIsSubmitting(true);
-
+    
     try {
-      const url = reportToEdit 
+      const errors = validateForm();
+      if (errors.length > 0) {
+        setError(errors.join(', '));
+        return;
+      }
+
+      // Validar y formatear fecha para el servidor
+      const selectedDate = new Date(formData.fecha);
+      if (isNaN(selectedDate.getTime())) {
+        setError('Fecha no válida');
+        return;
+      }
+
+      setIsSubmitting(true);
+
+      const payload = {
+        ...formData,
+        areaId: Number(areaId),
+        fecha: formatDateForServer(formData.fecha), // Usar función de formato para servidor
+        qualityCreditNoteUSDBattery: Number(formData.qualityCreditNoteUSDBattery) || 0,
+        cantidadQuejas: Number(formData.cantidadQuejas) || 0,
+        cantidadQuejasBateria: Number(formData.cantidadQuejasBateria) || 0
+      };
+
+      const isEdit = !!reportToEdit;
+      const url = isEdit 
         ? `/api/quality-reports?id=${reportToEdit.id}`
         : '/api/quality-reports';
 
-      const method = reportToEdit ? 'PATCH' : 'POST';
-
       const response = await fetch(url, {
-        method,
+        method: isEdit ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          areaId: Number(areaId),
-          fecha: new Date(formData.fecha).toISOString()
-        })
+        body: JSON.stringify(payload)
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Error al guardar el reporte');
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Error ${isEdit ? 'actualizando' : 'creando'} reporte`);
       }
 
       // Reset después del éxito
-      setFormData(initialFormData);
+      setFormData({
+        ...initialFormData,
+        fecha: formatDateForInput(new Date()) // Resetear con fecha actual bien formateada
+      });
       setReportToEdit(null);
-      setSuccess(`Reporte ${reportToEdit ? 'actualizado' : 'guardado'} exitosamente!`);
+      setSuccess(`Reporte ${isEdit ? 'actualizado' : 'guardado'} exitosamente!`);
+      router.refresh();
+
     } catch (error) {
-      console.error('Error:', error);
-      setError(error.message || 'Error interno del servidor');
+      console.error('Error en submit:', error);
+      setError(error.message || 'Error al procesar la solicitud');
+      
+      if (reportToEdit) {
+        // Restaurar datos de edición con fecha bien formateada
+        setFormData({
+          ...reportToEdit,
+          fecha: formatDateForInput(reportToEdit.fecha)
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleEditReport = (report) => {
-    setReportToEdit(report);
+    // Asegurar formato correcto de fecha al editar
+    setReportToEdit({
+      ...report,
+      fecha: report.fecha // Mantener el valor original para el formateo en useEffect
+    });
     document.getElementById('quality-form')?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  // Configuración para el ReportList
+  const reportFieldsConfig = [
+    { key: 'fecha', label: 'Fecha', type: 'date' },
+    { key: 'qualityCreditNoteUSD', label: 'Credit Note USD' },
+    { key: 'qualityCreditNoteUSDBattery', label: 'Credit Note Battery', type: 'number' },
+    { key: 'cantidadQuejas', label: 'Quejas', type: 'number' },
+    { key: 'cantidadQuejasBateria', label: 'Quejas Batería', type: 'number' }
+  ];
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md max-w-6xl mx-auto">
@@ -122,7 +177,6 @@ export default function CalidadForm({ areaId, areaName }) {
 
       <form id="quality-form" onSubmit={handleSubmit} className="space-y-4 mb-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Todos los inputs ahora usan formData directamente */}
           <div>
             <label className="block text-sm font-medium text-gray-700">Fecha *</label>
             <input
@@ -137,6 +191,7 @@ export default function CalidadForm({ areaId, areaName }) {
             />
           </div>
 
+          {/* Resto de los campos del formulario... */}
           <div>
             <label className="block text-sm font-medium text-gray-700">Quality Credit Note USD *</label>
             <input
@@ -150,7 +205,6 @@ export default function CalidadForm({ areaId, areaName }) {
             />
           </div>
 
-          {/* Resto de los inputs... */}
           <div>
             <label className="block text-sm font-medium text-gray-700">Quality Credit Note USD Battery</label>
             <input
@@ -259,13 +313,8 @@ export default function CalidadForm({ areaId, areaName }) {
         reportToEdit={reportToEdit}
         apiPath="/api/quality-reports"
         emptyMessage="No hay reportes de calidad disponibles"
-        fieldsConfig={[
-          { label: 'Fecha', key: 'fecha', type: 'date' },
-          { label: 'Credit Note USD', key: 'qualityCreditNoteUSD', type: 'text' },
-          { label: 'Credit Note Battery', key: 'qualityCreditNoteUSDBattery', type: 'number' },
-          { label: 'Quejas', key: 'cantidadQuejas', type: 'number' },
-          { label: 'Quejas Batería', key: 'cantidadQuejasBateria', type: 'number' }
-        ]}
+        fieldsConfig={reportFieldsConfig}
+        cardComponent={ReportCard}
       />
     </div>
   );
