@@ -4,18 +4,14 @@ import { useRouter } from 'next/navigation';
 import ReportList from './ReportList';
 import ReportCard from './ReportList/ReportCard';
 
-// Función para formatear fechas para input date (YYYY-MM-DD)
 const formatDateForInput = (dateString) => {
   if (!dateString) return '';
   
-  // Si es string ISO (de la API), extraemos directamente los componentes
   if (typeof dateString === 'string') {
-    // Manejar tanto fechas UTC como con zona horaria
     const datePart = dateString.split('T')[0];
     return datePart;
   }
   
-  // Si es objeto Date (por precaución)
   const date = new Date(dateString);
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -25,13 +21,11 @@ const formatDateForInput = (dateString) => {
 };
 
 export default function DSQForm({ areaId, areaName }) {
+  const [tipo, setTipo] = useState('CLIENTE');
   const initialFormData = {
-    fechaqc: formatDateForInput(new Date()),
-    fechaqcBateria: formatDateForInput(new Date()),
-    diasSinQueja: 0,
-    diasSinQuejaBateria: 0,
+    fechaQueja: formatDateForInput(new Date()),
     cantidadQuejas: 0,
-    cantidadQuejasBateria: 0
+    diasSinQueja: 0
   };
 
   const [formData, setFormData] = useState(initialFormData);
@@ -41,15 +35,21 @@ export default function DSQForm({ areaId, areaName }) {
   const [reportToEdit, setReportToEdit] = useState(null);
   const router = useRouter();
 
+  const resetForm = () => {
+    setFormData(initialFormData);
+    setReportToEdit(null);
+    setError('');
+    setSuccess('');
+    setTipo('CLIENTE');
+  };
+
   useEffect(() => {
     if (reportToEdit) {
+      setTipo(reportToEdit.tipo);
       setFormData({
-        fechaqc: formatDateForInput(reportToEdit.fechaQuejaCliente),
-        fechaqcBateria: formatDateForInput(reportToEdit.fechaQuejaClienteBateria),
-        diasSinQueja: reportToEdit.diasSinQuejas || 0,
-        diasSinQuejaBateria: reportToEdit.diasSinQuejasBateria || 0,
+        fechaQueja: formatDateForInput(reportToEdit.fechaQueja),
         cantidadQuejas: reportToEdit.cantidadQuejas || 0,
-        cantidadQuejasBateria: reportToEdit.cantidadQuejasBateria || 0
+        diasSinQueja: reportToEdit.diasSinQueja || 0
       });
     }
   }, [reportToEdit]);
@@ -58,17 +58,24 @@ export default function DSQForm({ areaId, areaName }) {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: ['fechaqc', 'fechaqcBateria'].includes(name) 
+      [name]: name.includes('fecha') 
         ? value 
-        : Number(value) || 0
+        : Math.max(0, Number(value))
     }));
+  };
+
+  const handleTipoChange = (newTipo) => {
+    setTipo(newTipo);
   };
 
   const validateForm = () => {
     const errors = [];
-    if (!formData.fechaqc) errors.push('Fecha de queja cliente es requerida');
-    if (!formData.fechaqcBateria) errors.push('Fecha de queja batería es requerida');
+    
+    if (!formData.fechaQueja) errors.push('Fecha de queja es requerida');
+    if (formData.cantidadQuejas < 0) errors.push('Cantidad de quejas no puede ser negativa');
+    if (!tipo) errors.push('Tipo de queja es requerido');
     if (!areaId) errors.push('Área no especificada');
+    
     return errors;
   };
 
@@ -86,20 +93,19 @@ export default function DSQForm({ areaId, areaName }) {
     setIsSubmitting(true);
 
     try {
-      // Preparamos payload con fechas en formato YYYY-MM-DD
       const payload = {
-        ...formData,
         areaId: Number(areaId),
-        fechaQuejaCliente: formData.fechaqc, // Ya está en formato correcto
-        fechaQuejaClienteBateria: formData.fechaqcBateria // Ya está en formato correcto
+        tipo: tipo,
+        fechaQueja: formData.fechaQueja,
+        cantidadQuejas: formData.cantidadQuejas,
+        diasSinQueja: formData.diasSinQueja
       };
 
-      const isEdit = !!reportToEdit;
-      const url = isEdit 
+      const url = reportToEdit 
         ? `/api/quejas-reports?id=${reportToEdit.id}`
         : '/api/quejas-reports';
 
-      const method = isEdit ? 'PUT' : 'POST';
+      const method = reportToEdit ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
         method,
@@ -109,12 +115,11 @@ export default function DSQForm({ areaId, areaName }) {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || `Error ${isEdit ? 'actualizando' : 'creando'} reporte`);
+        throw new Error(errorData.error || `Error ${reportToEdit ? 'actualizando' : 'creando'} reporte`);
       }
 
-      setFormData(initialFormData);
-      setReportToEdit(null);
-      setSuccess(`Reporte ${isEdit ? 'actualizado' : 'guardado'} exitosamente!`);
+      resetForm();
+      setSuccess(`Reporte ${reportToEdit ? 'actualizado' : 'guardado'} exitosamente!`);
       router.refresh();
 
     } catch (error) {
@@ -122,13 +127,11 @@ export default function DSQForm({ areaId, areaName }) {
       setError(error.message || 'Error al procesar la solicitud');
       
       if (reportToEdit) {
+        setTipo(reportToEdit.tipo);
         setFormData({
-          fechaqc: formatDateForInput(reportToEdit.fechaQuejaCliente),
-          fechaqcBateria: formatDateForInput(reportToEdit.fechaQuejaClienteBateria),
-          diasSinQueja: reportToEdit.diasSinQuejas || 0,
-          diasSinQuejaBateria: reportToEdit.diasSinQuejasBateria || 0,
+          fechaQueja: formatDateForInput(reportToEdit.fechaQueja),
           cantidadQuejas: reportToEdit.cantidadQuejas || 0,
-          cantidadQuejasBateria: reportToEdit.cantidadQuejasBateria || 0
+          diasSinQueja: reportToEdit.diasSinQueja || 0
         });
       }
     } finally {
@@ -141,15 +144,35 @@ export default function DSQForm({ areaId, areaName }) {
     document.getElementById('dsq-form')?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Configuración para el ReportList
-  const reportFieldsConfig = [
-    { label: 'Fecha Queja', key: 'fechaQuejaCliente', type: 'date' },
-    { label: 'Fecha Batería', key: 'fechaQuejaClienteBateria', type: 'date' },
-    { label: 'Cant. Quejas', key: 'cantidadQuejas', type: 'number' },
-    { label: 'Quejas Batería', key: 'cantidadQuejasBateria', type: 'number' },
-    { label: 'Días Sin Queja', key: 'diasSinQuejas', type: 'number' },
-    { label: 'Días Batería', key: 'diasSinQuejasBateria', type: 'number' }
-  ];
+  // Configuración corregida para los campos del reporte
+const reportFieldsConfig = [
+  { 
+    label: 'Tipo', 
+    key: 'tipo',
+    render: (value) => (
+      <span className={`px-2 py-1 rounded-full text-xs ${
+        value === 'CLIENTE' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+      }`}>
+        {value}
+      </span>
+    )
+  },
+  { 
+    label: 'Fecha', 
+    key: 'fechaQueja',
+    render: (value) => formatDateForInput(value)
+  },
+  { 
+    label: 'Cantidad', 
+    key: 'cantidadQuejas',
+    className: 'text-center font-medium'
+  },
+  { 
+    label: 'Días sin queja', 
+    key: 'diasSinQueja',
+    className: 'text-center font-medium'
+  }
+];
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md max-w-6xl mx-auto">
@@ -161,14 +184,38 @@ export default function DSQForm({ areaId, areaName }) {
       {success && <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-lg">✅ {success}</div>}
 
       <form id="dsq-form" onSubmit={handleSubmit} className="space-y-4 mb-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Fecha Queja Cliente */}
+        <div className="flex space-x-4 mb-6">
+          <button
+            type="button"
+            onClick={() => handleTipoChange('CLIENTE')}
+            className={`px-4 py-2 rounded-md ${
+              tipo === 'CLIENTE' 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+            }`}
+          >
+            Queja Cliente
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTipoChange('BATERIA')}
+            className={`px-4 py-2 rounded-md ${
+              tipo === 'BATERIA' 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+            }`}
+          >
+            Queja Batería
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Fecha Queja Cliente *</label>
+            <label className="block text-sm font-medium text-gray-700">Fecha Queja *</label>
             <input
               type="date"
-              name="fechaqc"
-              value={formData.fechaqc}
+              name="fechaQueja"
+              value={formData.fechaQueja}
               onChange={handleChange}
               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
               max={new Date().toISOString().split('T')[0]}
@@ -177,7 +224,6 @@ export default function DSQForm({ areaId, areaName }) {
             />
           </div>
 
-          {/* Cantidad Quejas */}
           <div>
             <label className="block text-sm font-medium text-gray-700">Cantidad Quejas *</label>
             <input
@@ -192,7 +238,6 @@ export default function DSQForm({ areaId, areaName }) {
             />
           </div>
 
-          {/* Días Sin Queja */}
           <div>
             <label className="block text-sm font-medium text-gray-700">Días Sin Queja</label>
             <input
@@ -205,60 +250,15 @@ export default function DSQForm({ areaId, areaName }) {
               disabled={isSubmitting}
             />
           </div>
-
-          {/* Fecha Queja Batería */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Fecha Queja Batería *</label>
-            <input
-              type="date"
-              name="fechaqcBateria"
-              value={formData.fechaqcBateria}
-              onChange={handleChange}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-              max={new Date().toISOString().split('T')[0]}
-              required
-              disabled={isSubmitting}
-            />
-          </div>
-
-          {/* Cantidad Quejas Batería */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Cantidad Quejas Batería</label>
-            <input
-              type="number"
-              name="cantidadQuejasBateria"
-              value={formData.cantidadQuejasBateria}
-              onChange={handleChange}
-              min="0"
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-              disabled={isSubmitting}
-            />
-          </div>
-
-          {/* Días Sin Queja Batería */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Días Sin Queja Batería</label>
-            <input
-              type="number"
-              name="diasSinQuejaBateria"
-              value={formData.diasSinQuejaBateria}
-              onChange={handleChange}
-              min="0"
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-              disabled={isSubmitting}
-            />
-          </div>
         </div>
 
         <div className="flex justify-end pt-4 space-x-3">
           {reportToEdit && (
             <button
               type="button"
-              onClick={() => {
-                setReportToEdit(null);
-                setFormData(initialFormData);
-              }}
+              onClick={resetForm}
               className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+              disabled={isSubmitting}
             >
               Cancelar Edición
             </button>
@@ -268,7 +268,7 @@ export default function DSQForm({ areaId, areaName }) {
             disabled={isSubmitting}
             className={`px-6 py-2 text-white rounded-md transition-colors ${
               isSubmitting 
-                ? 'bg-gray-400 cursor-not-allowed' 
+                ? 'bg-blue-400 cursor-not-allowed' 
                 : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
             }`}
           >

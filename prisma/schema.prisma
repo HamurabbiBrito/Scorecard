@@ -88,21 +88,23 @@ model QualityReport {
 }
 
 model QuejasReport {
-  id                      Int       @id @default(autoincrement())
-  areaId                  Int
-  area                    Area      @relation(fields: [areaId], references: [id], onDelete: Cascade)
-  fechaQuejaCliente       DateTime
-  cantidadQuejas          Int 
-  diasSinQuejas           Int
-  fechaQuejaClienteBateria DateTime
-  cantidadQuejasBateria   Int 
-  diasSinQuejasBateria    Int
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
+  id               Int       @id @default(autoincrement())
+  areaId           Int
+  area             Area      @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  tipo             QuejaType
+  fechaQueja       DateTime
+  cantidadQuejas   Int
+  diasSinQueja     Int
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  @@index([areaId, fechaQuejaCliente])
+  @@index([areaId, fechaQueja])
 }
 
+enum QuejaType {
+  CLIENTE
+  BATERIA
+}
 model KaizenReport {
   id                      Int       @id @default(autoincrement())
   fecha                   DateTime
