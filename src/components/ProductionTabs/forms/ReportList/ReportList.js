@@ -63,6 +63,11 @@ export default function ReportList({
   useEffect(() => {
     if (areaId) loadReports();
   }, [areaId]);
+  useEffect(() => {
+  const handleReload = () => loadReports();
+  window.addEventListener('reloadReports', handleReload);
+  return () => window.removeEventListener('reloadReports', handleReload);
+}, []);
 
   return (
     <div className="mt-8">

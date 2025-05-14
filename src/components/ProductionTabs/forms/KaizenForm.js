@@ -11,10 +11,8 @@ export default function KaizenForm({ areaId, areaName }) {
     savings: '',
     projectDescription: '',
     anualProjectDescription: '',
-    savingsAnualTarget: '',
+    savingsAnual: '',
     target5s: '',
-    today: '',
-    mesAnterior: '',
     numeroKaizen: ''
   });
 
@@ -29,23 +27,28 @@ export default function KaizenForm({ areaId, areaName }) {
     if (reportToEdit) {
       setFormData({
         fecha: formatDateForInput(reportToEdit.fecha),
-        percentAudit5s: reportToEdit.percentAudit5s || '',
-        kaizenIdeas: reportToEdit.kaizenIdeas || '',
-        savings: reportToEdit.savings || '',
+        percentAudit5s: reportToEdit.percentAudit5s?.toString() || '',
+        kaizenIdeas: reportToEdit.kaizenIdeas?.toString() || '',
+        savings: reportToEdit.savings?.toString() || '',
         projectDescription: reportToEdit.projectDescription || '',
         anualProjectDescription: reportToEdit.anualProjectDescription || '',
-        savingsAnualTarget: reportToEdit.savingsAnualTarget || '',
+        savingsAnual: reportToEdit.savingsAnual || '',
         target5s: reportToEdit.target5s || '',
-        today: reportToEdit.today || '',
-        mesAnterior: reportToEdit.mesAnterior || '',
-        numeroKaizen: reportToEdit.numeroKaizen || ''
+        numeroKaizen: reportToEdit.numeroKaizen?.toString() || ''
       });
     }
   }, [reportToEdit]);
 
   const formatDateForInput = (dateString) => {
     if (!dateString) return new Date().toISOString().split('T')[0];
+
+
     const date = new Date(dateString);
+    const utcDate = new Date(Date.UTC(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate()
+  ));
     return date.toISOString().split('T')[0];
   };
 
@@ -65,10 +68,8 @@ export default function KaizenForm({ areaId, areaName }) {
       savings: '',
       projectDescription: '',
       anualProjectDescription: '',
-      savingsAnualTarget: '',
+      savingsAnual: '',
       target5s: '',
-      today: '',
-      mesAnterior: '',
       numeroKaizen: ''
     });
     setReportToEdit(null);
@@ -100,14 +101,18 @@ export default function KaizenForm({ areaId, areaName }) {
       const payload = {
         ...formData,
         areaId: Number(areaId),
-        fecha: new Date(formData.fecha).toISOString()
+        fecha: new Date(formData.fecha).toISOString,
+        percentAudit5s: formData.percentAudit5s,
+        kaizenIdeas: formData.kaizenIdeas,
+        savings: formData.savings,
+        numeroKaizen: formData.numeroKaizen
       };
 
       const url = reportToEdit 
         ? `/api/kaizen-reports?id=${reportToEdit.id}`
         : '/api/kaizen-reports';
 
-      const method = reportToEdit ? 'PUT' : 'POST';
+      const method = reportToEdit ? 'PATCH' : 'POST';
 
       const response = await fetch(url, {
         method,
@@ -115,41 +120,39 @@ export default function KaizenForm({ areaId, areaName }) {
         body: JSON.stringify(payload)
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al guardar el proyecto');
+        throw new Error(result.error || 'Error al guardar el proyecto');
       }
 
-      resetForm();
       setSuccess(`Proyecto ${reportToEdit ? 'actualizado' : 'registrado'} exitosamente!`);
-      router.refresh();
+      resetForm();
+      
+      // Disparar evento para actualizar ReportList
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('reloadKaizenReports'));
+      }
 
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error en submit:', error);
       setError(error.message || 'Error al procesar la solicitud');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Configuración para ReportList - Asegúrate de que coincida con los campos de tu API
   const reportFieldsConfig = [
-  { label: 'Fecha', key: 'fecha', type: 'date' },
-  { label: '% Audit 5S', key: 'percentAudit5s', type: 'number' },
-  { label: 'Ideas Kaizen', key: 'kaizenIdeas', type: 'number' },
-  { label: 'Ahorros', key: 'savings', type: 'number' },
-  { label: 'Descripción', key: 'projectDescription', truncate: true },
-  { label: 'Desc. Anual', key: 'anualProjectDescription', truncate: true },
-  { label: 'Ahorro Anual', key: 'savingsAnual' },
-  { label: 'Target 5S', key: 'target5s' },
-  { label: 'N° Kaizen', key: 'numeroKaizen', type: 'number' }
-];
-  // Justo antes del return en KaizenForm
-console.log('Datos que se enviarán a ReportList:', {
-  areaId,
-  apiPath: '/api/kaizen-reports',
-  fieldsConfig: reportFieldsConfig
-});
+    { label: 'Fecha', key: 'fecha', type: 'date' },
+    { label: '% Audit 5S', key: 'percentAudit5s', type: 'number' },
+    { label: 'Ideas Kaizen', key: 'kaizenIdeas', type: 'number' },
+    { label: 'Ahorros', key: 'savings', type: 'number' },
+    { label: 'Descripción', key: 'projectDescription', truncate: true },
+    { label: 'Desc. Anual', key: 'anualProjectDescription', truncate: true },
+    { label: 'Ahorro Anual', key: 'savingsAnual' },
+    { label: 'Target 5S', key: 'target5s' },
+    { label: 'N° Kaizen', key: 'numeroKaizen', type: 'number' }
+  ];
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md max-w-6xl mx-auto">
@@ -157,8 +160,17 @@ console.log('Datos que se enviarán a ReportList:', {
         Proyectos Kaizen - {areaName?.toUpperCase() || 'Área no especificada'}
       </h2>
       
-      {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">⚠️ {error}</div>}
-      {success && <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-lg">✅ {success}</div>}
+      {error && (
+        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">
+          ⚠️ {error}
+        </div>
+      )}
+      
+      {success && (
+        <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-lg">
+          ✅ {success}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4 mb-8">
         {/* Campos del formulario */}
@@ -181,43 +193,48 @@ console.log('Datos que se enviarán a ReportList:', {
 
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Percent Audit 5´s
+              % Audit 5S
             </label>
             <input
-              type="text"
+              type="number"
               name="percentAudit5s"
               value={formData.percentAudit5s}
               onChange={handleChange}
               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
               disabled={isSubmitting}
+              step="0.01"
+              min="0"
+              max="100"
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Kaizen ideas
+              Ideas Kaizen
             </label>
             <input
-              type="text"
+              type="number"
               name="kaizenIdeas"
               value={formData.kaizenIdeas}
               onChange={handleChange}
               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
               disabled={isSubmitting}
+              min="0"
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Savings
+              Ahorros
             </label>
             <input
-              type="text"
+              type="number"
               name="savings"
               value={formData.savings}
               onChange={handleChange}
               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
               disabled={isSubmitting}
+              min="0"
             />
           </div>
         </div>
@@ -225,7 +242,7 @@ console.log('Datos que se enviarán a ReportList:', {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Project description
+              Descripción del Proyecto
             </label>
             <textarea
               rows={4}
@@ -240,7 +257,7 @@ console.log('Datos que se enviarán a ReportList:', {
 
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Anual Project description
+              Descripción Anual
             </label>
             <textarea
               rows={4}
@@ -248,21 +265,20 @@ console.log('Datos que se enviarán a ReportList:', {
               value={formData.anualProjectDescription}
               onChange={handleChange}
               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-              required
               disabled={isSubmitting}
             />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Savings anual target
+              Ahorro Anual
             </label>
             <input
               type="text"
-              name="savingsAnualTarget"
-              value={formData.savingsAnualTarget}
+              name="savingsAnual"
+              value={formData.savingsAnual}
               onChange={handleChange}
               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
               disabled={isSubmitting}
@@ -271,7 +287,7 @@ console.log('Datos que se enviarán a ReportList:', {
 
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Target 5´s
+              Target 5S
             </label>
             <input
               type="text"
@@ -285,43 +301,16 @@ console.log('Datos que se enviarán a ReportList:', {
 
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Today
+              N° Kaizen
             </label>
             <input
-              type="text"
-              name="today"
-              value={formData.today}
-              onChange={handleChange}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-              disabled={isSubmitting}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Mes anterior
-            </label>
-            <input
-              type="text"
-              name="mesAnterior"
-              value={formData.mesAnterior}
-              onChange={handleChange}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-              disabled={isSubmitting}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Numero Kaizen
-            </label>
-            <input
-              type="text"
+              type="number"
               name="numeroKaizen"
               value={formData.numeroKaizen}
               onChange={handleChange}
               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
               disabled={isSubmitting}
+              min="0"
             />
           </div>
         </div>
@@ -351,7 +340,6 @@ console.log('Datos que se enviarán a ReportList:', {
         </div>
       </form>
 
-      {/* ReportList con estilos mejorados */}
       <div className="mt-8">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Reportes existentes</h3>
         <ReportList
@@ -361,6 +349,7 @@ console.log('Datos que se enviarán a ReportList:', {
           apiPath="/api/kaizen-reports"
           emptyMessage="No hay proyectos Kaizen registrados"
           fieldsConfig={reportFieldsConfig}
+          reloadEvent="reloadKaizenReports"
           className="bg-gray-50 rounded-lg p-4"
         />
       </div>

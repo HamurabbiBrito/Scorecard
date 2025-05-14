@@ -11,20 +11,40 @@ export default function ReportCard({
     { label: 'Días sin accidentes', key: 'diasUltimoAccidente', type: 'number' }
   ],
   customRenderers = {},
-  isDSQForm = false // Nuevo prop para identificar DSQForm
+  isDSQForm = false
 }) {
-  // Formateador de fecha mejorado
+  // Formateador de fecha corregido para manejar zona horaria
   const formatDate = (dateString) => {
     if (!dateString) return 'Sin fecha';
     try {
+      // Crear fecha en UTC y ajustar a zona horaria local
       const date = new Date(dateString);
-      return date.toLocaleDateString('es-ES', {
+      const adjustedDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
+      
+      return adjustedDate.toLocaleDateString('es-ES', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric'
       });
     } catch {
       return dateString;
+    }
+  };
+
+  // Función para formatear valores según su tipo
+  const formatValue = (key, value) => {
+    if (customRenderers[key]) return customRenderers[key](value);
+    
+    const fieldConfig = fieldsConfig.find(f => f.key === key);
+    if (!fieldConfig) return value;
+    
+    switch(fieldConfig.type) {
+      case 'date': 
+        return formatDate(value);
+      case 'number': 
+        return value?.toLocaleString('es-ES') || '0';
+      default: 
+        return value;
     }
   };
 
@@ -77,25 +97,13 @@ export default function ReportCard({
     );
   }
 
-  // Renderizado original para otros formularios
-  const formatValue = (key, value) => {
-    if (customRenderers[key]) return customRenderers[key](value);
-    
-    const fieldConfig = fieldsConfig.find(f => f.key === key);
-    if (!fieldConfig) return value;
-    
-    switch(fieldConfig.type) {
-      case 'date': return formatDate(value);
-      case 'number': return value?.toLocaleString('es-ES') || '0';
-      default: return value;
-    }
-  };
-
+  // Filtramos los campos a mostrar
   const displayFields = fieldsConfig.filter(field => 
     !['id', 'areaId', 'createdAt', 'updatedAt'].includes(field.key) && 
     report[field.key] !== undefined
   );
 
+  // Renderizado estándar para otros formularios
   return (
     <div className={`border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow ${
       isEditing ? 'ring-2 ring-blue-500' : 'bg-white'

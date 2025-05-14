@@ -24,6 +24,7 @@ export default function Navbar() {
         <div className="flex space-x-4">
           <Link href="/production/PVC" className="hover:underline">PVC</Link>
           <Link href="/production/XLPE" className="hover:underline">XLPE</Link>
+          <Link href="/production/Base" className="hover:underline">Base</Link>
           <Link href="/profile" className="hover:underline">Perfil</Link>
           <Link href="/settings" className="hover:underline">Configuración</Link>
           
