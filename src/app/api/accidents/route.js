@@ -2,14 +2,12 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { validateAccidentReport, validatePartialAccidentReport } from '@/validations/accidentReports'
 
-// Configuración reusable de CORS
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 }
 
-// Helpers (se mantienen igual)
 const errorResponse = (message, status = 400) => {
   return NextResponse.json(
     { error: message },
@@ -21,7 +19,23 @@ const successResponse = (data, status = 200) => {
   return NextResponse.json(data, { status, headers: corsHeaders })
 }
 
-// POST - Crear nuevo reporte (existente)
+const calculateDaysSinceLast = async (areaId, beforeDate = null) => {
+  const where = { areaId: Number(areaId) }
+  if (beforeDate) where.fecha = { lt: new Date(beforeDate) }
+
+  const lastAccident = await prisma.accidentReport.findFirst({
+    where,
+    orderBy: { fecha: 'desc' },
+    select: { fecha: true }
+  })
+
+  if (!lastAccident) return 0
+
+  const referenceDate = beforeDate ? new Date(beforeDate) : new Date()
+  const lastDate = new Date(lastAccident.fecha)
+  return Math.floor((referenceDate - lastDate) / (1000 * 60 * 60 * 24))
+}
+
 export async function POST(request) {
   try {
     const contentType = request.headers.get('content-type')
@@ -36,6 +50,8 @@ export async function POST(request) {
       return errorResponse(validation.errors, 400)
     }
 
+    const diasUltimoAccidente = await calculateDaysSinceLast(data.areaId, data.fecha)
+
     const newReport = await prisma.$transaction(async (tx) => {
       const report = await tx.accidentReport.create({
         data: {
@@ -43,7 +59,7 @@ export async function POST(request) {
           areaId: Number(data.areaId),
           cantidadAccidentes: Number(data.cantidadAccidentes),
           cantidadCuasiAccidentes: Number(data.cantidadCuasiAccidentes),
-          diasUltimoAccidente: Number(data.diasUltimoAccidente),
+          diasUltimoAccidente,
         },
         include: { area: true }
       })
@@ -64,13 +80,24 @@ export async function POST(request) {
   }
 }
 
-// GET - Obtener reportes (existente)
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
     const areaId = searchParams.get('areaId')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
+    const lastOnly = searchParams.get('last') === 'true'
+    const beforeDate = searchParams.get('beforeDate')
+
+    if (lastOnly && areaId) {
+      const daysSinceLast = await calculateDaysSinceLast(areaId)
+      return successResponse({ daysSinceLast })
+    }
+
+    if (beforeDate && areaId) {
+      const daysSinceLast = await calculateDaysSinceLast(areaId, beforeDate)
+      return successResponse({ daysSinceLast })
+    }
 
     if (isNaN(page) || isNaN(limit)) {
       return errorResponse('Parámetros de paginación inválidos', 400)
@@ -107,126 +134,6 @@ export async function GET(request) {
   }
 }
 
-// PUT - Actualizar reporte existente (nuevo)
-export async function PUT(request) {
-  try {
-    const contentType = request.headers.get('content-type')
-    if (!contentType?.includes('application/json')) {
-      return errorResponse('Formato de contenido no válido', 415)
-    }
-
-    const { searchParams } = new URL(request.url)
-    const id = searchParams.get('id')
-    
-    if (!id || isNaN(id)) {
-      return errorResponse('ID de reporte no válido', 400)
-    }
-
-    const data = await request.json()
-    
-    const validation = validateAccidentReport(data)
-    if (!validation.success) {
-      return errorResponse(validation.errors, 400)
-    }
-
-    const updatedReport = await prisma.$transaction(async (tx) => {
-      // 1. Actualizar el reporte
-      const report = await tx.accidentReport.update({
-        where: { id: Number(id) },
-        data: {
-          fecha: new Date(data.fecha),
-          areaId: Number(data.areaId),
-          cantidadAccidentes: Number(data.cantidadAccidentes),
-          cantidadCuasiAccidentes: Number(data.cantidadCuasiAccidentes),
-          diasUltimoAccidente: Number(data.diasUltimoAccidente),
-        },
-        include: { area: true }
-      })
-
-      // 2. Actualizar última fecha de accidente en el área si cambió
-      if (new Date(data.fecha) > new Date(report.area.lastAccidentDate || 0)) {
-        await tx.area.update({
-          where: { id: Number(data.areaId) },
-          data: { lastAccidentDate: new Date(data.fecha) }
-        })
-      }
-
-      return report
-    })
-
-    return successResponse(updatedReport)
-
-  } catch (error) {
-    console.error('Error PUT /api/accidents:', error)
-    
-    // Manejo específico para registro no encontrado
-    if (error.code === 'P2025') {
-      return errorResponse('Reporte no encontrado', 404)
-    }
-    
-    return errorResponse('Error interno del servidor', 500)
-  }
-}
-
-// DELETE - Eliminar reporte (nuevo)
-export async function DELETE(request) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const id = searchParams.get('id')
-    
-    if (!id || isNaN(id)) {
-      return errorResponse('ID de reporte no válido', 400)
-    }
-
-    // Transacción para mantener consistencia
-    const result = await prisma.$transaction(async (tx) => {
-      // 1. Obtener el reporte antes de eliminar
-      const report = await tx.accidentReport.findUnique({
-        where: { id: Number(id) },
-        include: { area: true }
-      })
-
-      if (!report) {
-        throw { code: 'P2025' } // Simular error de Prisma
-      }
-
-      // 2. Eliminar el reporte
-      await tx.accidentReport.delete({
-        where: { id: Number(id) }
-      })
-
-      // 3. Verificar si era el último accidente del área
-      const lastAccident = await tx.accidentReport.findFirst({
-        where: { areaId: report.areaId },
-        orderBy: { fecha: 'desc' },
-        select: { fecha: true }
-      })
-
-      // 4. Actualizar última fecha del área
-      await tx.area.update({
-        where: { id: report.areaId },
-        data: { 
-          lastAccidentDate: lastAccident?.fecha || null 
-        }
-      })
-
-      return { success: true }
-    })
-
-    return successResponse({ message: 'Reporte eliminado correctamente' })
-
-  } catch (error) {
-    console.error('Error DELETE /api/accidents:', error)
-    
-    if (error.code === 'P2025') {
-      return errorResponse('Reporte no encontrado', 404)
-    }
-    
-    return errorResponse('Error interno al eliminar reporte', 500)
-  }
-}
-
-// NUEVO MÉTODO PATCH para edición directa
 export async function PATCH(request) {
   try {
     const contentType = request.headers.get('content-type')
@@ -243,41 +150,74 @@ export async function PATCH(request) {
 
     const data = await request.json()
     
-    // Validación parcial (solo campos presentes)
-    const validation = validatePartialAccidentReport(data);
+    const validation = validatePartialAccidentReport(data)
     if (!validation.success) {
-      return errorResponse(validation.errors, 400);
+      return errorResponse(validation.errors, 400)
     }
 
-    // Preparar updates
+    const currentReport = await prisma.accidentReport.findUnique({
+      where: { id: Number(id) },
+      select: { fecha: true, areaId: true }
+    })
+
+    if (!currentReport) {
+      return errorResponse('Reporte no encontrado', 404)
+    }
+
     const updates = {}
     if (data.fecha !== undefined) updates.fecha = new Date(data.fecha)
     if (data.areaId !== undefined) updates.areaId = Number(data.areaId)
     if (data.cantidadAccidentes !== undefined) updates.cantidadAccidentes = Number(data.cantidadAccidentes)
     if (data.cantidadCuasiAccidentes !== undefined) updates.cantidadCuasiAccidentes = Number(data.cantidadCuasiAccidentes)
-    if (data.diasUltimoAccidente !== undefined) updates.diasUltimoAccidente = Number(data.diasUltimoAccidente)
+
+    if (data.fecha !== undefined && new Date(data.fecha).getTime() !== new Date(currentReport.fecha).getTime()) {
+      updates.diasUltimoAccidente = await calculateDaysSinceLast(
+        currentReport.areaId, 
+        data.fecha
+      )
+    }
 
     const updatedReport = await prisma.$transaction(async (tx) => {
-      // 1. Actualizar el reporte
       const report = await tx.accidentReport.update({
         where: { id: Number(id) },
         data: updates,
         include: { area: true }
       })
 
-      // 2. Si se actualizó la fecha, verificar si es la más reciente
       if (data.fecha !== undefined) {
         const latestAccident = await tx.accidentReport.findFirst({
           where: { areaId: report.areaId },
           orderBy: { fecha: 'desc' },
-          select: { fecha: true }
+          select: { id: true, fecha: true }
         })
 
-        if (latestAccident && new Date(latestAccident.fecha).getTime() === new Date(data.fecha).getTime()) {
+        if (latestAccident && latestAccident.id === report.id) {
           await tx.area.update({
             where: { id: report.areaId },
             data: { lastAccidentDate: new Date(data.fecha) }
           })
+
+          const nextAccident = await tx.accidentReport.findFirst({
+            where: {
+              areaId: report.areaId,
+              id: { not: report.id },
+              fecha: { gt: new Date(data.fecha) }
+            },
+            orderBy: { fecha: 'asc' },
+            select: { id: true, fecha: true }
+          })
+
+          if (nextAccident) {
+            const daysDifference = Math.floor(
+              (new Date(nextAccident.fecha) - new Date(data.fecha)) / 
+              (1000 * 60 * 60 * 24)
+            )
+            
+            await tx.accidentReport.update({
+              where: { id: nextAccident.id },
+              data: { diasUltimoAccidente: daysDifference }
+            })
+          }
         }
       }
 
@@ -297,4 +237,6 @@ export async function PATCH(request) {
   }
 }
 
-// Los demás métodos (POST, GET, PUT, DELETE, OPTIONS) se mantienen exactamente igual como los tienes...
+export async function OPTIONS() {
+  return new NextResponse(null, { headers: corsHeaders })
+}

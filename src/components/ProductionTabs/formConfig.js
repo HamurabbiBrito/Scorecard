@@ -64,18 +64,19 @@ const BaseFormsConfig = [
 
 // Exportación de la configuración completa
 export const formsConfig = [
-  ...BaseFormsConfig,
-  {
-    id: 'data-view',
-    label: 'Edición Directa',
-    form: ({ areaId, areaName }) => (
-      <DataView 
-        areaId={areaId} 
-        areaName={areaName}
-        availableForms={BaseFormsConfig} // Usando el nombre correcto
-      />
-    )
-  }
+  ...BaseFormsConfig
+  // ,
+  // {
+  //   id: 'data-view',
+  //   label: 'Edición Directa',
+  //   form: ({ areaId, areaName }) => (
+  //     <DataView 
+  //       areaId={areaId} 
+  //       areaName={areaName}
+  //       availableForms={BaseFormsConfig} // Usando el nombre correcto
+  //     />
+  //   )
+  // }
 ];
 
 // Exportación opcional de la configuración base
