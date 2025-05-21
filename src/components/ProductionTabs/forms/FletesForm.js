@@ -242,7 +242,7 @@ export default function FletesForm({ areaId, areaName = '' }) {
           
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Cliente (opcional)
+              Cliente
             </label>
             <input
               type="text"

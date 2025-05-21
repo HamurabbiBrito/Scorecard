@@ -39,18 +39,10 @@ export default function KaizenForm({ areaId, areaName }) {
     }
   }, [reportToEdit]);
 
-  const formatDateForInput = (dateString) => {
-    if (!dateString) return new Date().toISOString().split('T')[0];
-
-
-    const date = new Date(dateString);
-    const utcDate = new Date(Date.UTC(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate()
-  ));
-    return date.toISOString().split('T')[0];
-  };
+const formatDateForInput = (dateString) => {
+  if (!dateString) return new Date().toISOString().split('T')[0];
+  return new Date(dateString).toISOString().split('T')[0];
+};
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -101,7 +93,7 @@ export default function KaizenForm({ areaId, areaName }) {
       const payload = {
         ...formData,
         areaId: Number(areaId),
-        fecha: new Date(formData.fecha).toISOString,
+        fecha: new Date(formData.fecha).toISOString(),
         percentAudit5s: formData.percentAudit5s,
         kaizenIdeas: formData.kaizenIdeas,
         savings: formData.savings,
@@ -127,7 +119,8 @@ export default function KaizenForm({ areaId, areaName }) {
       }
 
       setSuccess(`Proyecto ${reportToEdit ? 'actualizado' : 'registrado'} exitosamente!`);
-      resetForm();
+      setTimeout(() => resetForm(), 3000);
+      
       
       // Disparar evento para actualizar ReportList
       if (typeof window !== 'undefined') {

@@ -184,7 +184,7 @@ model ProductionReport {
   areaId                      Int
   area                        Area      @relation(fields: [areaId], references: [id], onDelete: Cascade)
   maquinas                    String
-  numeroSap                   Float
+ numeroSap   String   @map("numero_sap")  // Cambiar de Float a String
   produccionKm                Float
   produccionKg                Float
   kgScrap                     Float
